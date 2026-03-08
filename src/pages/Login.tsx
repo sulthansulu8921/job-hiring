@@ -15,7 +15,7 @@ export default function Login() {
         setLoading(true);
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 800));
-        await login('seeker', {
+        await login('dummy_access_token', 'dummy_refresh_token', {
             id: "1",
             name: "Test User",
             email: "test@example.com",

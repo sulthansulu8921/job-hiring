@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Send, MoreHorizontal, Flag, X, Pin } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { useOnClickOutside } from "../../hooks/useOnClickOutside";
+import api from "../../services/api";
 
 interface Comment {
     _id: string;
     user: {
+        id: string; // Added user ID
         name: string;
         avatar: string;
     };
@@ -26,9 +29,10 @@ interface CommentItemProps {
     onPin: (id: string) => void;
     onHide: (id: string) => void;
     onReport: (id: string) => void;
+    onNavigate: (id: string) => void; // Added onNavigate
 }
 
-function CommentItem({ comment, onLike, onPin, onHide, onReport }: CommentItemProps) {
+function CommentItem({ comment, onLike, onPin, onHide, onReport, onNavigate }: CommentItemProps) {
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +42,10 @@ function CommentItem({ comment, onLike, onPin, onHide, onReport }: CommentItemPr
 
     return (
         <div className={cn("flex gap-2 relative group items-start", comment.isPinned && "bg-blue-50/30 p-2 rounded-lg -mx-2")}>
-            <div className="h-8 w-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 mt-0.5">
+            <div
+                className="h-8 w-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 mt-0.5 cursor-pointer"
+                onClick={() => onNavigate(comment.user.id)}
+            >
                 <img src={comment.user.avatar} alt={comment.user.name} className="h-full w-full object-cover" />
             </div>
 
@@ -46,7 +53,12 @@ function CommentItem({ comment, onLike, onPin, onHide, onReport }: CommentItemPr
                 {/* Bubble */}
                 <div className="bg-gray-100 px-3 py-2 rounded-2xl rounded-tl-none inline-block">
                     <div className="flex items-center gap-1 mb-0.5">
-                        <span className="text-xs font-bold text-gray-900">{comment.user.name}</span>
+                        <span
+                            className="text-xs font-bold text-gray-900 hover:text-primary-600 cursor-pointer"
+                            onClick={() => onNavigate(comment.user.id)}
+                        >
+                            {comment.user.name}
+                        </span>
                         {comment.isPinned && <Pin className="h-3 w-3 text-blue-500 fill-current rotate-45" />}
                     </div>
                     <p className="text-sm text-gray-800 leading-snug">{comment.text}</p>
@@ -103,8 +115,9 @@ function CommentItem({ comment, onLike, onPin, onHide, onReport }: CommentItemPr
     );
 }
 
-export default function CommentsSection({ postId, isPage = false }: { postId: string, isPage?: boolean }) {
+export default function CommentsSection({ postId, type = 'post', isPage = false }: { postId: string, type?: 'post' | 'job' | 'service', isPage?: boolean }) {
     const { user, requireAuth } = useAuth();
+    const navigate = useNavigate(); // Initialize navigate
     // Mock data initialization for demo purposes since backend doesn't support these fields yet
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState("");
@@ -112,52 +125,62 @@ export default function CommentsSection({ postId, isPage = false }: { postId: st
     useEffect(() => {
         const fetchComments = async () => {
             try {
-                // Mock fetch
-                const mockComments: Comment[] = [
-                    {
-                        _id: "1",
-                        user: { name: "Alice", avatar: "https://ui-avatars.com/api/?name=Alice&background=random" },
-                        text: "Great opportunity!",
-                        date: "2023-10-27T10:00:00Z",
-                        likes: 5,
-                        isLiked: false
-                    },
-                    {
-                        _id: "2",
-                        user: { name: "Bob", avatar: "https://ui-avatars.com/api/?name=Bob&background=random" },
-                        text: "Is this remote?",
-                        date: "2023-10-27T10:30:00Z",
-                        likes: 0,
-                        isLiked: false
+                const response = await api.get('/comments/', {
+                    params: {
+                        [type]: postId, // Backend filters handle this
                     }
-                ];
-                setComments(mockComments);
+                });
+                // Handle paginated response if results key exists
+                const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
+
+                // Map backend comments to frontend structure
+                const mappedComments: Comment[] = data.map((c: any) => ({
+                    _id: c.id.toString(),
+                    user: {
+                        id: c.user.toString(),
+                        name: c.user_name || "Unknown",
+                        avatar: c.user_avatar || `https://ui-avatars.com/api/?name=${c.user_name}&background=random`
+                    },
+                    text: c.content,
+                    date: c.created_at,
+                    likes: 0,
+                    isLiked: false
+                }));
+                setComments(mappedComments);
             } catch (err) {
                 console.error(err);
             }
         };
         fetchComments();
-    }, [postId]);
+    }, [postId, type]);
 
     const handlePostComment = () => {
         requireAuth(async () => {
             if (!newComment.trim()) return;
 
             try {
-                // Mock post
+                // Determine which FK to use based on post context
+                const payload: any = { content: newComment };
+                payload[type] = postId;
+
+                const response = await api.post('/comments/', payload);
+                const c = response.data;
+
                 const newCommentObj: Comment = {
-                    _id: Date.now().toString(),
-                    user: { name: user?.name || "User", avatar: user?.avatar || "https://ui-avatars.com/api/?background=random" },
-                    text: newComment,
-                    date: new Date().toISOString(),
+                    _id: c.id.toString(),
+                    user: {
+                        id: user?.id?.toString() || "unknown", // Fix type casting
+                        name: c.user_name || user?.name || "User",
+                        avatar: c.user_avatar || user?.avatar || "https://ui-avatars.com/api/?background=random"
+                    },
+                    text: c.content,
+                    date: c.created_at,
                     likes: 0,
                     isLiked: false
                 };
 
                 setComments(prev => [...prev, newCommentObj]);
                 setNewComment("");
-
-                // await api.post(`/jobs/${postId}/comment`, { text: newComment });
             } catch (err) {
                 console.error("Failed to post comment:", err);
             }
@@ -194,6 +217,10 @@ export default function CommentsSection({ postId, isPage = false }: { postId: st
         alert("Comment reported to admins.");
     };
 
+    const handleNavigateToProfile = (userId: string) => { // Added handleNavigateToProfile
+        navigate(`/profile/${userId}`);
+    };
+
     return (
         <div className={cn("bg-transparent space-y-4", !isPage ? "p-4 border-t border-gray-100" : "")}>
             {/* Comment List */}
@@ -209,6 +236,7 @@ export default function CommentsSection({ postId, isPage = false }: { postId: st
                             onPin={handlePin}
                             onHide={handleHide}
                             onReport={handleReport}
+                            onNavigate={handleNavigateToProfile} // Passed onNavigate prop
                         />
                     ))
                 )}

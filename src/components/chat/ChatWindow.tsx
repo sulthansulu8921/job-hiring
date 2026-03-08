@@ -1,12 +1,14 @@
 import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
-import { ArrowLeft, Send, Phone, Video, Loader2, Image as ImageIcon, Mic, Smile, MoreVertical, ThumbsUp } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Image as ImageIcon, Mic, Smile, MoreVertical, ThumbsUp, MessageCircle as MessageCircleIcon, Edit2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useWebSocket } from "../../hooks/useWebSocket";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
 
 interface Message {
     id: string;
     text?: string;
-    content?: string; // URL for image/audio/sticker
+    content?: string;
     type: 'text' | 'image' | 'audio' | 'sticker';
     isMe: boolean;
     time: string;
@@ -15,100 +17,275 @@ interface Message {
 interface ChatWindowProps {
     conversation: {
         id: number;
-        user: { name: string; avatar: string; role: string; online: boolean };
+        user: { id: number; name: string; avatar: string; role: string; online: boolean };
     } | null;
     onBack?: () => void;
+    initialMessage?: string;
+    onInitialMessageUsed?: () => void;
 }
-
-// Mock initial messages for demonstration
-const MOCK_MESSAGES_DATA: Record<number, Message[]> = {
-    1: [
-        { id: '1', text: "Hi! I saw your application for the React Developer role.", type: 'text', isMe: false, time: "10:00 AM" },
-        { id: '2', text: "Hello Sarah! Thanks for reaching out. Yes, I'm very interested.", type: 'text', isMe: true, time: "10:05 AM" },
-        { id: '3', text: "Great! Your portfolio looks impressive. Especially the e-commerce project.", type: 'text', isMe: false, time: "10:15 AM" },
-        { id: '4', content: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", type: 'image', isMe: false, time: "10:16 AM" },
-        { id: '5', text: "When are you available for a quick call?", type: 'text', isMe: false, time: "10:30 AM" },
-    ],
-    2: [
-        { id: '1', text: "Thanks for applying! We will review your profile.", type: 'text', isMe: false, time: "Yesterday" },
-    ],
-    3: [
-        { id: '1', text: "Your application status has been updated.", type: 'text', isMe: false, time: "2d ago" },
-    ]
-};
 
 const STICKERS = ["👍", "👋", "❤️", "😂", "😮", "😢", "🎉", "🔥"];
 
-export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
+export default function ChatWindow({ conversation, onBack, initialMessage = "", onInitialMessageUsed }: ChatWindowProps) {
+    const { user: currentUser } = useAuth();
     const bottomRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
     const [showStickers, setShowStickers] = useState(false);
 
+    // Edit/Delete features
+    const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+    const [editInput, setEditInput] = useState("");
+    const [activeMsgId, setActiveMsgId] = useState<string | null>(null);
+    const [showMenu, setShowMenu] = useState(false);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<BlobPart[]>([]);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const { sendMessage, lastMessage } = useWebSocket('/ws/chat/');
+
+    // Fetch message history
     useEffect(() => {
         if (conversation) {
-            setLoading(true);
-            setTimeout(() => {
-                setMessages(MOCK_MESSAGES_DATA[conversation.id] || []);
-                setLoading(false);
-            }, 600);
+            setMessages([]); // Clear messages when conversation changes
+            const fetchMessages = async () => {
+                setLoading(true);
+                try {
+                    const res = await api.get(`/messages/?user_id=${conversation.user.id}`);
+                    const myId = currentUser?.id ? Number(currentUser.id) : null;
+
+                    // Handle both paginated and non-paginated responses gracefully
+                    const messageList = Array.isArray(res.data) ? res.data : (res.data.results || []);
+
+                    const mappedMessages: Message[] = messageList.map((m: any) => ({
+                        id: m.id.toString(),
+                        text: m.content,
+                        content: m.attachment || m.content,
+                        type: m.message_type || 'text',
+                        isMe: myId !== null ? Number(m.sender_id) === myId : Number(m.sender_id) !== Number(conversation.user.id),
+                        time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    }));
+                    setMessages(mappedMessages);
+                } catch (err) {
+                    console.error("Failed to fetch message history:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchMessages();
         }
-    }, [conversation]);
+    }, [conversation, currentUser]);
+
+    // Handle incoming real-time messages via WebSocket
+    useEffect(() => {
+        if (!lastMessage || !conversation) return;
+
+        const myId = currentUser?.id ? Number(currentUser.id) : null;
+        const msgSenderId = Number(lastMessage.sender_id);
+        const msgReceiverId = Number(lastMessage.receiver_id);
+        const otherUserId = Number(conversation.user.id);
+
+        // Accept messages that are part of this conversation
+        const isRelevant =
+            (msgSenderId === otherUserId) || // They sent to me
+            (myId !== null && msgSenderId === myId && msgReceiverId === otherUserId); // I sent to them (echo)
+
+        if (isRelevant) {
+            if (lastMessage.event_type === 'message_deleted') {
+                setMessages(prev => prev.filter(m => m.id !== lastMessage.message_id?.toString()));
+                return;
+            }
+            if (lastMessage.event_type === 'message_edited') {
+                setMessages(prev => prev.map(m => m.id === lastMessage.message_id?.toString() ? { ...m, text: lastMessage.message, content: lastMessage.message } : m));
+                return;
+            }
+
+            const isMe = myId !== null && msgSenderId === myId;
+            const incomingMsg: Message = {
+                id: lastMessage.message_id ? lastMessage.message_id.toString() : Date.now().toString(),
+                text: lastMessage.message,
+                content: lastMessage.attachment || lastMessage.message,
+                type: lastMessage.message_type || 'text',
+                isMe,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => {
+                // Prevent duplicate echoes if message_id exists
+                if (incomingMsg.id && prev.some(m => m.id === incomingMsg.id)) return prev;
+                return [...prev, incomingMsg];
+            });
+        }
+    }, [lastMessage, conversation, currentUser]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isRecording]);
 
+    // Pre-fill input with auto-generated message if provided
+    useEffect(() => {
+        if (initialMessage) {
+            setInput(initialMessage);
+            onInitialMessageUsed?.();
+        }
+    }, [initialMessage]);
+
     const handleSend = async (type: 'text' | 'image' | 'audio' | 'sticker' = 'text', content: string = input) => {
-        if (!content.trim() && type === 'text') return;
+        if (!content.trim() && (type === 'text' || type === 'sticker')) return;
         if (!conversation) return;
 
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            text: type === 'text' ? content : undefined,
-            content: type !== 'text' ? content : undefined,
-            type: type,
-            isMe: true,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages(prev => [...prev, newMessage]);
-        if (type === 'text') setInput("");
-        setShowStickers(false);
-
-        // Echo response
-        setTimeout(() => {
-            if (Math.random() > 0.7) {
-                setMessages(prev => [...prev, {
-                    id: Date.now().toString() + '_echo',
-                    text: "Sounds good!",
-                    type: 'text',
-                    isMe: false,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
-            }
-        }, 2000);
+        if (type === 'text' || type === 'sticker') {
+            if (type === 'text') setInput("");
+            setShowStickers(false);
+            // Send via WebSocket — the echo back will add the message to the UI
+            sendMessage({
+                content: content,
+                receiver_id: conversation.user.id
+            });
+        } else {
+            // For images/audio, add optimistically (not fully implemented in backend yet)
+            const newMessage: Message = {
+                id: Date.now().toString(),
+                content: content,
+                type: type,
+                isMe: true,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, newMessage]);
+            setShowStickers(false);
+        }
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            // Create object URL for preview
-            const imageUrl = URL.createObjectURL(file);
-            handleSend('image', imageUrl);
+        if (file && conversation) {
+            const formData = new FormData();
+            formData.append('receiver', conversation.user.id.toString());
+            formData.append('message_type', 'image');
+            formData.append('attachment', file);
+
+            try {
+                await api.post('/messages/send/', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                // Success: The WebSocket will broadcast the message back to us to render it.
+            } catch (err) {
+                console.error("Failed to upload image:", err);
+            }
+
+            // clear the input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const file = new File([audioBlob], 'voice_message.webm', { type: 'audio/webm' });
+
+                if (conversation) {
+                    const formData = new FormData();
+                    formData.append('receiver', conversation.user.id.toString());
+                    formData.append('message_type', 'audio');
+                    formData.append('attachment', file);
+
+                    try {
+                        await api.post('/messages/send/', formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        });
+                    } catch (err) {
+                        console.error("Failed to send audio:", err);
+                    }
+                }
+
+                // Stop all tracks to release mic
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingTime(0);
+            timerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+
+        } catch (err) {
+            console.error("Microphone access denied or error:", err);
+            alert("Please allow microphone permissions to send voice messages.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
         }
     };
 
     const toggleRecording = () => {
         if (isRecording) {
-            // Stop recording and send mock audio
-            setIsRecording(false);
-            handleSend('audio', 'mock-audio-url');
+            stopRecording();
         } else {
-            setIsRecording(true);
+            startRecording();
+        }
+    };
+
+    const handleDeleteMessage = async (msgId: string) => {
+        try {
+            await api.delete(`/messages/${msgId}/`);
+            // UI will update via WebSocket broadcast
+        } catch (err) {
+            console.error("Failed to delete message:", err);
+        }
+    };
+
+    const handleStartEdit = (msgId: string, text: string) => {
+        setEditingMsgId(msgId);
+        setEditInput(text);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingMsgId || !editInput.trim()) return;
+        try {
+            await api.put(`/messages/${editingMsgId}/`, { content: editInput });
+            setEditingMsgId(null);
+            setEditInput("");
+        } catch (err) {
+            console.error("Failed to edit message:", err);
+        }
+    };
+
+    const handleClearChat = async () => {
+        if (!conversation || !window.confirm("Are you sure you want to clear this entire chat history?")) return;
+        try {
+            await api.delete(`/messages/conversations/${conversation.user.id}/`);
+            setMessages([]);
+            setShowMenu(false);
+        } catch (err) {
+            console.error("Failed to clear chat:", err);
         }
     };
 
@@ -147,10 +324,21 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                         <p className="text-xs text-gray-500 font-medium">{conversation.user.online ? 'Active now' : conversation.user.role}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <Phone className="h-6 w-6 text-primary-600 cursor-pointer hover:text-primary-700 transition-colors" />
-                    <Video className="h-6 w-6 text-primary-600 cursor-pointer hover:text-primary-700 transition-colors" />
-                    <MoreVertical className="h-6 w-6 text-primary-600 cursor-pointer hover:text-primary-700 transition-colors" />
+                <div className="flex items-center gap-4 relative">
+                    <button onClick={() => setShowMenu(!showMenu)}>
+                        <MoreVertical className="h-6 w-6 text-primary-600 cursor-pointer hover:text-primary-700 transition-colors" />
+                    </button>
+                    {showMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+                            <button
+                                onClick={handleClearChat}
+                                className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Clear Chat
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -179,13 +367,55 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                                     )}
                                     {!msg.isMe && isSequence && <div className="w-9" />} {/* Spacer for avatar alignment */}
 
-                                    <div className={`max-w-[70%] ${msg.type === 'text' ? `px-4 py-2 text-[15px]` : 'p-0 overflow-hidden'} rounded-[20px] shadow-sm relative transition-all duration-200 
+                                    <div
+                                        className={`max-w-[70%] ${msg.type === 'text' ? `px-4 py-2 text-[15px]` : 'p-0 overflow-hidden'} rounded-[20px] shadow-sm relative transition-all duration-200 cursor-pointer select-none
                                         ${msg.isMe
-                                            ? 'bg-primary-600 text-white rounded-br-sm'
-                                            : 'bg-gray-100 text-gray-900 rounded-bl-sm'}
+                                                ? 'bg-primary-600 text-white rounded-br-sm'
+                                                : 'bg-gray-100 text-gray-900 rounded-bl-sm'}
                                         ${msg.type === 'sticker' ? 'bg-transparent shadow-none !p-0 !text-4xl' : ''}
-                                    `}>
-                                        {msg.type === 'text' && <p>{msg.text}</p>}
+                                    `}
+                                        onTouchStart={() => {
+                                            if (msg.isMe && msg.type === 'text' && msg.id !== editingMsgId) {
+                                                longPressTimerRef.current = setTimeout(() => {
+                                                    setActiveMsgId(msg.id);
+                                                }, 500); // 500ms hold
+                                            }
+                                        }}
+                                        onTouchEnd={() => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }}
+                                        onTouchMove={() => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }}
+
+                                        onMouseDown={() => {
+                                            if (msg.isMe && msg.type === 'text' && msg.id !== editingMsgId) {
+                                                longPressTimerRef.current = setTimeout(() => {
+                                                    setActiveMsgId(msg.id);
+                                                }, 500);
+                                            }
+                                        }}
+                                        onMouseUp={() => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }}
+                                        onMouseLeave={() => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }}
+                                    >
+                                        {msg.type === 'text' && (
+                                            msg.id === editingMsgId ? (
+                                                <div className="flex flex-col gap-2 min-w-[200px]">
+                                                    <input
+                                                        autoFocus
+                                                        value={editInput}
+                                                        onChange={e => setEditInput(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter') handleSaveEdit();
+                                                            if (e.key === 'Escape') setEditingMsgId(null);
+                                                        }}
+                                                        className="text-gray-900 px-2 py-1 rounded text-sm w-full"
+                                                    />
+                                                    <div className="flex justify-end gap-2 text-xs">
+                                                        <button onClick={(e) => { e.stopPropagation(); setEditingMsgId(null); setActiveMsgId(null); }} className="text-gray-300 hover:text-white z-10 relative">Cancel</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleSaveEdit(); setActiveMsgId(null); }} className="text-white font-medium hover:underline z-10 relative">Save</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p>{msg.text}</p>
+                                            )
+                                        )}
 
                                         {msg.type === 'image' && (
                                             <div className="relative group cursor-pointer">
@@ -194,14 +424,8 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                                         )}
 
                                         {msg.type === 'audio' && (
-                                            <div className={`flex items-center gap-2 p-2 min-w-[150px] ${msg.isMe ? 'text-primary-100' : 'text-gray-600'}`}>
-                                                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${msg.isMe ? 'bg-white/20' : 'bg-gray-200'}`}>
-                                                    <div className="w-0 h-0 border-t-4 border-t-transparent border-l-8 border-l-current border-b-4 border-b-transparent ml-1"></div>
-                                                </div>
-                                                <div className="flex-1 h-1 bg-current/20 rounded-full overflow-hidden">
-                                                    <div className="h-full w-1/3 bg-current rounded-full"></div>
-                                                </div>
-                                                <span className="text-xs">0:12</span>
+                                            <div className={`flex items-center gap-2 p-2 rounded-xl overflow-hidden ${msg.isMe ? 'bg-primary-700/20' : 'bg-gray-200'} `}>
+                                                <audio controls src={msg.content} className="h-10 w-[220px]" />
                                             </div>
                                         )}
 
@@ -212,15 +436,30 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                                         )}
                                     </div>
 
-                                    {/* Timestamp tooltips could go here */}
+                                    {/* Edit / Delete Long Press Actions */}
+                                    {msg.id === activeMsgId && msg.id !== editingMsgId && (
+                                        <div className="animate-in fade-in slide-in-from-left-2 flex items-center gap-1 mr-2 bg-gray-50/90 backdrop-blur-md rounded-xl px-2 shadow-md border border-gray-200 z-10">
+                                            <button onClick={() => { handleStartEdit(msg.id, msg.text || ""); setActiveMsgId(null); }} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Edit message">
+                                                <Edit2 className="h-4 w-4" />
+                                            </button>
+                                            <button onClick={() => { handleDeleteMessage(msg.id); setActiveMsgId(null); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete message">
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                            <button onClick={() => setActiveMsgId(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors text-xs font-medium">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
                         {isRecording && (
-                            <div className="flex justify-end mt-2">
-                                <div className="bg-primary-600 text-white px-4 py-2 rounded-2xl rounded-br-none animate-pulse flex items-center gap-2">
-                                    <Mic className="h-4 w-4 animate-pulse" />
-                                    <span className="text-sm">Recording...</span>
+                            <div className="flex justify-end mt-2 animate-in slide-in-from-bottom-2">
+                                <div className="bg-red-500 text-white px-5 py-2.5 rounded-2xl rounded-br-none shadow-md flex items-center gap-3">
+                                    <div className="h-2 w-2 bg-white rounded-full animate-ping"></div>
+                                    <span className="font-medium text-sm">
+                                        Recording ({Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')})
+                                    </span>
                                 </div>
                             </div>
                         )}
@@ -236,7 +475,7 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                         {STICKERS.map(sticker => (
                             <button
                                 key={sticker}
-                                onClick={() => handleSend('sticker', sticker)}
+                                onClick={() => setInput(prev => prev + sticker)}
                                 className="text-3xl hover:scale-125 transition-transform"
                             >
                                 {sticker}
@@ -280,18 +519,31 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
                         </Button>
                     </div>
 
-                    <div className="flex-1 relative bg-gray-100 rounded-2xl flex items-center">
-                        <Input
+                    <div className="flex-1 relative bg-gray-100 rounded-2xl flex items-end">
+                        <textarea
                             placeholder="Aa"
                             value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSend()}
-                            className="bg-transparent border-none focus:ring-0 shadow-none py-3 px-4 text-[15px] placeholder-gray-500 w-full"
+                            rows={1}
+                            onChange={e => {
+                                setInput(e.target.value);
+                                // Auto-resize up to 5 rows
+                                e.target.style.height = 'auto';
+                                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                            }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            style={{ resize: 'none', minHeight: '44px', maxHeight: '120px' }}
+                            className="bg-transparent border-none focus:outline-none focus:ring-0 shadow-none py-3 px-4 text-[15px] placeholder-gray-500 w-full overflow-y-scroll scrollbar-hide leading-snug"
                         />
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="mr-1 text-gray-400 hover:text-gray-600"
+                            onClick={() => setShowStickers(!showStickers)}
+                            className="mr-1 mb-1 text-gray-400 hover:text-gray-600 flex-shrink-0"
                         >
                             <Smile className="h-5 w-5" />
                         </Button>
@@ -320,11 +572,3 @@ export default function ChatWindow({ conversation, onBack }: ChatWindowProps) {
     );
 }
 
-// Icon helper
-function MessageCircleIcon({ className }: { className?: string }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-        </svg>
-    )
-}

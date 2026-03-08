@@ -2,11 +2,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Github, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { useGoogleLogin } from '@react-oauth/google';
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
 
 export default function AuthModal() {
-    const { isAuthModalOpen, closeAuthModal, login, register } = useAuth();
+    const { isAuthModalOpen, closeAuthModal, login } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -17,48 +19,64 @@ export default function AuthModal() {
         password: ""
     });
 
+    const handleGoogleLogin = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            setLoading(true);
+            setError("");
+            try {
+                const res = await api.post('/auth/google/', {
+                    access_token: tokenResponse.access_token
+                });
+                const { tokens, user } = res.data;
+                login(tokens.access, tokens.refresh, user);
+                closeAuthModal();
+            } catch (err: any) {
+                setError("Google login failed. Please try again.");
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        },
+        onError: () => setError("Google login failed")
+    });
+
     if (!isAuthModalOpen) return null;
 
     const handleSubmit = async () => {
         setError("");
         setLoading(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 800)); // Simulate delay
-
             if (isLogin) {
-                // Mock login for now
-                if (form.email && form.password) {
-                    login('mock-token', {
-                        id: "1",
-                        name: "Test User",
-                        email: form.email,
-                        role: "jobseeker",
-                        avatar: "https://ui-avatars.com/api/?name=Test+User&background=random",
-                        verified: true,
-                        title: "Full Stack Developer",
-                        location: "Chennai, India"
-                    });
-                } else {
-                    throw new Error("Please enter email and password");
-                }
+                const res = await api.post('/auth/login/', {
+                    email: form.email,
+                    password: form.password
+                });
+                const { access, refresh } = res.data;
+
+                // Fetch user data
+                api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+                const userRes = await api.get('/auth/me/');
+
+                login(access, refresh, userRes.data);
             } else {
                 if (!form.name || !form.email || !form.password) {
                     throw new Error("All fields are required");
                 }
-                register({
-                    id: Date.now().toString(),
+                await api.post('/auth/register/', {
                     name: form.name,
                     email: form.email,
-                    role: "jobseeker",
-                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(form.name)}&background=random`,
-                    verified: false,
-                    title: "New Member",
-                    location: "India"
+                    password: form.password
                 });
+                // Assuming register returns user data, but we need to login after
+                // Let's just switch to login mode or show success
+                setIsLogin(true);
+                setError("");
+                alert("Account created successfully! Please log in.");
+                return;
             }
             closeAuthModal();
         } catch (err: any) {
-            setError(err.message || "Something went wrong");
+            setError(err.response?.data?.detail || err.response?.data?.error || err.message || "Something went wrong");
         } finally {
             setLoading(false);
         }
@@ -153,7 +171,7 @@ export default function AuthModal() {
                                 <Button variant="outline" className="w-full">
                                     <Github className="mr-2 h-4 w-4" /> GitHub
                                 </Button>
-                                <Button variant="outline" className="w-full">
+                                <Button variant="outline" className="w-full" onClick={() => handleGoogleLogin()}>
                                     <Mail className="mr-2 h-4 w-4" /> Google
                                 </Button>
                             </div>

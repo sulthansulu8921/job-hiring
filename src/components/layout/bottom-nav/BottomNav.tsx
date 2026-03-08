@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Compass, Plus, MessageSquare, User } from "lucide-react";
+import { Home, Compass, Plus, User, Bookmark } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -7,7 +7,7 @@ const NAV_ITEMS = [
     { icon: Home, label: "Home", path: "/" },
     { icon: Compass, label: "Explore", path: "/jobs" },
     { icon: Plus, label: "Post", path: "/post-job", isAction: true },
-    { icon: MessageSquare, label: "Inbox", path: "/messages", requiresAuth: true },
+    { icon: Bookmark, label: "Saved", path: "/saved", requiresAuth: true },
     { icon: User, label: "Profile", path: "/profile", requiresAuth: true },
 ];
 

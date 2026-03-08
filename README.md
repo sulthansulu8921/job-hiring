@@ -73,3 +73,8 @@ export default defineConfig([
 ```
 
 # thozhilurappu
+
+cd server 
+source venv/bin/activate 
+python manage.py runserver
+

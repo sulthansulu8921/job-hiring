@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import Sidebar from './sidebar/Sidebar';
 import BottomNav from './bottom-nav/BottomNav';
 import JobFilters from '../feed/JobFilters';
+import { GroupsSidebar } from './sidebar/GroupsSidebar';
 import Topbar from './Topbar';
+import NotificationToast from './NotificationToast';
 
 export default function Layout({ children }: { children: ReactNode }) {
     return (
@@ -21,6 +23,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     {/* Right Sidebar - Filters & Trending */}
                     <aside className="hidden xl:block w-80 sticky top-4 h-[calc(100vh-2rem)] space-y-4 overflow-y-auto pb-4 scrollbar-hide">
                         <JobFilters />
+                        <GroupsSidebar />
 
                         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mt-4">
                             <h3 className="font-bold text-gray-900 mb-4 text-sm">Suggested for you</h3>
@@ -36,6 +39,10 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </main>
             </div>
             <BottomNav />
+
+            {/* Global notification toast overlay */}
+            <NotificationToast />
         </div>
     );
 }
+

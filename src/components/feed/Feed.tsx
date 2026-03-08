@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { PostCard } from "./PostCard";
 import { Loader2 } from "lucide-react";
 import { usePosts } from "../../context/PostsContext";
@@ -8,19 +7,10 @@ interface FeedProps {
 }
 
 export default function Feed({ filterType }: FeedProps) {
-    const { posts } = usePosts();
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Simulate loading
-        const timer = setTimeout(() => {
-            setLoading(false);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, []);
+    const { posts, loading } = usePosts();
 
     const filteredPosts = filterType
-        ? posts.filter(p => p.type.toLowerCase() === filterType.toLowerCase()) // Basic filtering if needed
+        ? posts.filter(p => p.type?.toLowerCase() === filterType.toLowerCase()) // Basic filtering if needed
         : posts;
 
     if (loading) {
@@ -45,8 +35,8 @@ export default function Feed({ filterType }: FeedProps) {
 
     return (
         <div className="space-y-6 pb-20">
-            {filteredPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
+            {filteredPosts.map((post: any) => (
+                <PostCard key={`${post.feed_type || post.type}-${post.id}`} post={post} />
             ))}
             <div className="text-center py-8">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-50 text-gray-500 text-sm font-medium">

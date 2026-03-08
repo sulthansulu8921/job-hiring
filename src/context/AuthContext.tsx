@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import AuthModal from "../components/auth/AuthModal";
 import type { User } from "../types";
+import api from "../services/api";
 
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    login: (token: string, userData: User) => void;
+    login: (access: string, refresh: string, userData: User) => void;
     register: (userData: User) => void;
     logout: () => void;
     updateProfile: (data: Partial<User>) => void;
@@ -26,58 +28,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const checkAuth = async () => {
             const token = localStorage.getItem('token');
-            const storedUser = localStorage.getItem('user');
-
-            if (token === 'mock-token' && storedUser) {
+            if (token) {
                 try {
-                    setUser(JSON.parse(storedUser));
+                    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                    const res = await api.get('/auth/me/');
+                    setUser(res.data);
                 } catch (e) {
-                    console.error("Failed to parse user data", e);
+                    console.error("Auth check failed", e);
                     localStorage.removeItem('token');
-                    localStorage.removeItem('user');
+                    localStorage.removeItem('refresh_token');
+                    delete api.defaults.headers.common['Authorization'];
+                    setUser(null);
                 }
-            } else if (token === 'mock-token') {
-                // Fallback if token exists but no user data (dev/reset state)
-                setUser({
-                    id: "1",
-                    name: "Test User",
-                    email: "test@example.com",
-                    role: "jobseeker",
-                    avatar: "https://ui-avatars.com/api/?name=Test+User&background=random",
-                    title: "Full Stack Developer",
-                    location: "Chennai, India",
-                    verified: true
-                });
-            }
-            else if (token) {
-                // If there's a real token (from old backend), clear it as it's invalid now
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
             }
             setLoading(false);
         };
         checkAuth();
     }, []);
 
-    const login = (token: string, userData: User) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+    const login = async (access: string, refresh: string, userData: User) => {
+        localStorage.setItem('token', access);
+        localStorage.setItem('refresh_token', refresh);
+        api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
         setUser(userData);
         setIsAuthModalOpen(false);
     };
 
     const register = (userData: User) => {
-        const token = 'mock-token';
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+        // Simplified: in real flow, register might or might not auto-login
+        // For now, let's just keep the state update if needed, but usually 
+        // the modal will handle the API call and then call login() or open login view.
         setUser(userData);
         setIsAuthModalOpen(false);
     };
 
+    const navigate = useNavigate();
+
     const logout = () => {
         localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem('refresh_token');
+        delete api.defaults.headers.common['Authorization'];
         setUser(null);
+        navigate("/");
     };
 
     const updateProfile = (data: Partial<User>) => {

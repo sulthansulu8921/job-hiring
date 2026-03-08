@@ -1,43 +1,57 @@
 import { useNavigate } from "react-router-dom";
-import { CreatePost } from "../components/feed/CreatePost";
+import { CreatePostModal } from "../components/feed/CreatePostModal";
 import { usePosts } from "../context/PostsContext";
-import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 
 export default function PostJob() {
     const navigate = useNavigate();
-    const { addPost } = usePosts();
-    useAuth(); // Keeping hook for potential future use or side effects, or just remove if truly unused. 
-    // Actually better to just remove the unused variable.
+    const { refreshPosts } = usePosts();
 
     const handleSubmit = async (data: any) => {
-        // Data coming from CreatePost: { type, description, images, ...extraFields }
-        // We need to shape it into our Post object
+        try {
+            if (data.type === 'NORMAL') {
+                const formData = new FormData();
+                formData.append('content', data.description || '');
+                formData.append('post_type', 'regular');
+                if (data.image) formData.append('image', data.image);
 
-        const newPost: any = {
-            id: Date.now(),
-            type: data.type,
-            title: data.title || (data.type === 'NORMAL' ? undefined : "Untitled"), // Normal posts might not have title
-            description: data.description,
-            location: data.location || "Remote", // Fallback
-            postedAt: "Just now",
-            verified: false,
-            images: data.images,
-            user: {
-                id: "current-user",
-                name: "You",
-                role: "user" // In real app, get from auth context
-            },
-            ...data // Spread extra fields like company, salary, etc.
-        };
-
-        addPost(newPost);
-        navigate('/jobs');
+                await api.post('/posts/', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else if (data.type === 'JOB') {
+                await api.post('/jobs/', {
+                    title: data.title,
+                    company_name: data.company,
+                    description: data.description,
+                    salary_min: parseFloat(data.salary) || 0,
+                    location: data.location,
+                    job_type: data.jobType.toLowerCase().replace('-', '_'),
+                    experience: data.experience
+                });
+            } else if (data.type === 'SERVICE') {
+                await api.post('/services/', {
+                    title: data.title,
+                    description: data.description,
+                    price_min: parseFloat(data.price) || 0,
+                    location: data.location,
+                    category: data.category
+                });
+            }
+            await refreshPosts();
+            navigate('/jobs');
+        } catch (err) {
+            console.error("Create post failed", err);
+            alert("Failed to create post. Please try again.");
+        }
     };
 
     return (
-        <div className="max-w-2xl mx-auto px-4 py-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Post</h1>
-            <CreatePost onSubmit={handleSubmit} />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <CreatePostModal
+                isOpen={true}
+                onClose={() => navigate('/jobs')}
+                onSubmit={handleSubmit}
+            />
         </div>
     );
 }

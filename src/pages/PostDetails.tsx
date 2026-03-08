@@ -39,7 +39,11 @@ export default function PostDetails() {
 
                 {/* Always show comments on details page */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                    <CommentsSection postId={post.id.toString()} isPage={true} />
+                    <CommentsSection
+                        postId={post.id.toString()}
+                        type={post.type === 'JOB' ? 'job' : post.type === 'SERVICE' ? 'service' : 'post'}
+                        isPage={true}
+                    />
                 </div>
             </div>
         </div>

@@ -6,104 +6,45 @@ import { Badge } from "../components/ui/Badge";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
-interface Job {
-    _id: string;
-    title: string;
-    company: string;
-    location: string;
-    salary: string;
-    type: string;
-    description: string;
-    requirements: string[];
-    postedAt: string;
-    logo?: string;
-}
-
-const MOCK_JOBS: Record<string, Job> = {
-    "1": {
-        _id: "1",
-        title: "Senior React Developer",
-        company: "TechCorp Inc.",
-        location: "Chennai, TN",
-        salary: "₹12L - ₹18L",
-        type: "Full-Time",
-        postedAt: new Date().toISOString(),
-        description: `We are looking for an experienced Senior React Developer to join our dynamic team. You will be responsible for building high-performance, scalable web applications using React, TypeScript, and Tailwind CSS.
-        
-You will work closely with product managers and designers to deliver high-quality user experiences.`,
-        requirements: [
-            "5+ years of experience with React and modern JavaScript",
-            "Strong understanding of TypeScript and state management (Redux/Zustand)",
-            "Experience with REST APIs and GraphQL",
-            "Familiarity with CI/CD pipelines and testing frameworks"
-        ],
-        logo: "https://ui-avatars.com/api/?name=TechCorp+Inc&background=0D9488&color=fff"
-    },
-    "2": {
-        _id: "2",
-        title: "Product Designer (UI/UX)",
-        company: "Designify",
-        location: "Remote / WFH",
-        salary: "₹10L - ₹15L",
-        type: "Remote",
-        postedAt: new Date(Date.now() - 86400000).toISOString(),
-        description: `We are seeking a creative Product Designer to craft intuitive and beautiful user interfaces. You will be involved in the entire design process from user research to high-fidelity prototyping.`,
-        requirements: [
-            "3+ years of product design experience",
-            "Proficiency in Figma and prototyping tools",
-            "Strong portfolio showcasing web and mobile apps",
-            "Experience with design systems"
-        ],
-        logo: "https://ui-avatars.com/api/?name=Designify&background=4F46E5&color=fff"
-    },
-    // Fallback for other IDs
-    "default": {
-        _id: "default",
-        title: "Software Engineer",
-        company: "Generic Tech",
-        location: "Bangalore",
-        salary: "₹15L - ₹25L",
-        type: "Full-Time",
-        postedAt: new Date().toISOString(),
-        description: "This is a mock job posting for demonstration purposes.",
-        requirements: ["Proficiency in coding", "Good communication skills"],
-        logo: "https://ui-avatars.com/api/?name=Generic+Tech&background=random"
-    }
-};
-
 export default function JobDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { requireAuth } = useAuth();
-    const [job, setJob] = useState<Job | null>(null);
+    const [job, setJob] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
         const fetchJob = async () => {
-            setLoading(true);
-            setTimeout(() => {
-                if (id && MOCK_JOBS[id]) {
-                    setJob(MOCK_JOBS[id]);
-                } else if (id) {
-                    // In a real app 404, here just show default or 404
-                    // For demo let's show default if not found to avoid empty screens
-                    setJob({ ...MOCK_JOBS["default"], _id: id });
-                } else {
-                    setError("Job ID missing");
-                }
+            if (!id) {
+                setError("Job ID missing");
                 setLoading(false);
-            }, 500);
+                return;
+            }
+            try {
+                setLoading(true);
+                const res = await api.get(`/jobs/${id}/`);
+                setJob(res.data);
+            } catch (err: any) {
+                console.error("Failed to fetch job", err);
+                setError(err.response?.data?.detail || "Job not found or failed to load");
+            } finally {
+                setLoading(false);
+            }
         };
         fetchJob();
     }, [id]);
 
     const handleApply = () => {
-        requireAuth(() => {
-            // Implement apply logic or show success message
-            api.post(`/jobs/${id}/apply`)
-                .then(() => alert("Applied successfully!"))
-                .catch((err: any) => console.error("Failed to apply", err));
+        requireAuth(async () => {
+            try {
+                await api.post('/applications/', { job: id });
+                // navigate to chat after successful application
+                navigate(`/inbox?userId=${job.created_by}`);
+            } catch (err: any) {
+                console.error("Failed to apply", err);
+                alert(err.response?.data?.non_field_errors?.[0] || err.response?.data?.detail || "Failed to apply");
+            }
         });
     };
 
@@ -139,8 +80,8 @@ export default function JobDetails() {
                     <div className="flex items-start gap-4">
                         <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border border-gray-200">
                             <img
-                                src={job.logo || `https://ui-avatars.com/api/?name=${job.company}&background=random`}
-                                alt={job.company}
+                                src={job.company_logo || `https://ui-avatars.com/api/?name=${job.company_name}&background=random`}
+                                alt={job.company_name}
                                 className="h-full w-full object-cover"
                             />
                         </div>
@@ -148,7 +89,7 @@ export default function JobDetails() {
                             <h2 className="text-xl font-bold text-gray-900">{job.title}</h2>
                             <div className="flex items-center gap-2 text-gray-600 mt-1">
                                 <Building2 className="h-4 w-4" />
-                                <span className="font-medium">{job.company}</span>
+                                <span className="font-medium">{job.company_name}</span>
                             </div>
                         </div>
                     </div>
@@ -158,13 +99,13 @@ export default function JobDetails() {
                             <MapPin className="h-3 w-3" /> {job.location}
                         </Badge>
                         <Badge variant="outline" className="flex gap-1 items-center px-3 py-1 border-blue-200 bg-blue-50 text-blue-700">
-                            <Briefcase className="h-3 w-3" /> {job.type}
+                            <Briefcase className="h-3 w-3" /> {job.job_type}
                         </Badge>
                         <Badge variant="outline" className="flex gap-1 items-center px-3 py-1 border-green-200 bg-green-50 text-green-700">
-                            <DollarSign className="h-3 w-3" /> {job.salary}
+                            <DollarSign className="h-3 w-3" /> ₹{job.salary_min} - ₹{job.salary_max}
                         </Badge>
                         <span className="text-xs text-gray-400 flex items-center gap-1 ml-auto">
-                            <Clock className="h-3 w-3" /> {new Date(job.postedAt).toLocaleDateString()}
+                            <Clock className="h-3 w-3" /> {new Date(job.created_at).toLocaleDateString()}
                         </span>
                     </div>
                 </div>
@@ -178,7 +119,7 @@ export default function JobDetails() {
                         <>
                             <h3 className="font-bold text-lg text-gray-900 mt-6">Requirements</h3>
                             <ul className="list-disc list-inside space-y-2 text-gray-600">
-                                {job.requirements.map((req, i) => (
+                                {job.requirements.map((req: string, i: number) => (
                                     <li key={i}>{req}</li>
                                 ))}
                             </ul>

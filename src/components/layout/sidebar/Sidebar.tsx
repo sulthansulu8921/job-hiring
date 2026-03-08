@@ -11,10 +11,14 @@ import {
     Clock,
     Globe,
     Zap,
+    Settings as SettingsIcon,
+    Bookmark,
 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../ui/Button";
 import { useAuth } from "../../../context/AuthContext";
+import { useWebSocket } from "../../../hooks/useWebSocket";
+import api from "../../../services/api";
 import logo from "../../../assets/logo.png";
 
 const NAV_ITEMS = [
@@ -29,7 +33,9 @@ const NAV_ITEMS = [
 const AUTH_ITEMS = [
     { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Bell, label: "Notifications", path: "/notifications" },
+    { icon: Bookmark, label: "Saved", path: "/saved" },
     { icon: User, label: "Profile", path: "/profile" },
+    { icon: SettingsIcon, label: "Settings", path: "/settings" },
 ];
 
 export default function Sidebar() {
@@ -52,6 +58,36 @@ export default function Sidebar() {
             openAuthModal();
         }
     };
+
+    const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+    const { lastMessage: lastNotification } = useWebSocket('/ws/notifications/');
+
+    // Fetch initial unread count
+    React.useEffect(() => {
+        if (isAuthenticated) {
+            api.get('/notifications/')
+                .then(res => {
+                    const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
+                    setUnreadNotifications(data.filter((n: any) => !n.is_read).length);
+                })
+                .catch(err => console.error("Failed to fetch unread notifications:", err));
+        }
+    }, [isAuthenticated]);
+
+    // Listen for real-time notifications to increment badge
+    React.useEffect(() => {
+        if (lastNotification) {
+            // When a new notification comes via WS, increment the badge
+            setUnreadNotifications(prev => prev + 1);
+        }
+    }, [lastNotification]);
+
+    // Optionally reset badge when user visits notifications page
+    React.useEffect(() => {
+        if (location.pathname === '/notifications') {
+            setUnreadNotifications(0);
+        }
+    }, [location.pathname]);
 
     return (
         <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-white border-r border-gray-100 p-4 shadow-soft-xl z-40">
@@ -119,14 +155,22 @@ export default function Sidebar() {
                                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                                 )}
                             >
-                                <item.icon
-                                    className={cn(
-                                        "h-5 w-5 transition-colors",
-                                        isActive
-                                            ? "text-primary-600"
-                                            : "text-gray-400 group-hover:text-gray-600"
+                                <div className="relative">
+                                    <item.icon
+                                        className={cn(
+                                            "h-5 w-5 transition-colors",
+                                            isActive
+                                                ? "text-primary-600"
+                                                : "text-gray-400 group-hover:text-gray-600"
+                                        )}
+                                    />
+                                    {item.label === 'Notifications' && unreadNotifications > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white"></span>
+                                        </span>
                                     )}
-                                />
+                                </div>
                                 {item.label}
                             </Link>
                         );

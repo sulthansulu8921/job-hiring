@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import { SlidersHorizontal } from "lucide-react";
 import JobFilters from "../components/feed/JobFilters";
 import { AnimatePresence, motion } from "framer-motion";
+import CreatePostFloater from "../components/social/CreatePostFloater";
 
 export default function Home() {
     const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -54,6 +55,9 @@ export default function Home() {
 
             {/* Main Feed */}
             <Feed />
+
+            {/* Floating Create Button */}
+            <CreatePostFloater />
         </div>
     );
 }
