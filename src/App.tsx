@@ -15,6 +15,9 @@ import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import GroupDetail from "./pages/GroupDetail";
 import Saved from "./pages/Saved";
+import AppliedJobs from "./pages/AppliedJobs";
+import Applicants from "./pages/Applicants";
+import Search from "./pages/Search";
 
 function App() {
   return (
@@ -44,6 +47,9 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/groups/:id" element={<GroupDetail />} />
         <Route path="/saved" element={<Saved />} />
+        <Route path="/applied-jobs" element={<AppliedJobs />} />
+        <Route path="/applicants" element={<Applicants />} />
+        <Route path="/search" element={<Search />} />
       </Routes>
     </Layout>
   );

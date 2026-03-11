@@ -85,6 +85,18 @@ export default function GroupDetail() {
         setNewMessage('');
     };
 
+    const handleDeleteGroup = async () => {
+        if (!window.confirm("Are you sure you want to delete this community? This action cannot be undone.")) return;
+
+        try {
+            await api.delete(`/groups/${id}/`);
+            navigate('/');
+        } catch (err: any) {
+            console.error("Failed to delete group:", err);
+            alert(err.response?.data?.error || "Failed to delete community.");
+        }
+    };
+
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -202,6 +214,16 @@ export default function GroupDetail() {
                             </p>
                         </div>
                         <div className="flex gap-2">
+                            {Number(user?.id) === Number(group.created_by) && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleDeleteGroup}
+                                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete Community
+                                </Button>
+                            )}
                             <Button
                                 variant={group.is_member ? "outline" : "default"}
                                 onClick={() => group.is_member ? leaveGroup(group.id) : joinGroup(group.id)}

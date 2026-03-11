@@ -5,14 +5,25 @@ import JobFilters from '../feed/JobFilters';
 import { GroupsSidebar } from './sidebar/GroupsSidebar';
 import Topbar from './Topbar';
 import NotificationToast from './NotificationToast';
+import { useState } from 'react';
 
 export default function Layout({ children }: { children: ReactNode }) {
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
     return (
-        <div className="flex bg-slate-50 min-h-screen font-sans">
-            <Sidebar />
+        <div className="flex bg-slate-50 min-h-screen font-sans relative">
+            {/* Mobile Backdrop Overlay */}
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed justify-center z-[49] inset-0 md:hidden bg-black/50 backdrop-blur-sm transition-opacity"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
+            <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
             <div className="flex-1 flex flex-col min-w-0">
-                <Topbar />
+                <Topbar onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
                 <main className="flex-1 w-full max-w-7xl mx-auto flex gap-6 pt-4 px-0 md:px-4 lg:px-6">
                     {/* Main Feed/Content Area */}

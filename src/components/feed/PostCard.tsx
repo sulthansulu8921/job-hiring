@@ -722,37 +722,39 @@ export function PostCard({ post }: PostCardProps) {
                 <span>{(post as any).comments_count || 0} comments</span>
             </div>
 
-            {/* Footer / Actions */}
-            <div className="px-2 py-1 border-t border-gray-100 flex items-center justify-between mt-0">
-                <div className="flex gap-1 flex-1">
+            {/* Footer / Actions & CTA */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-gray-100">
+                {/* Social Actions */}
+                <div className="flex items-center gap-0.5 sm:gap-1 p-1 sm:px-2 sm:py-1 w-full sm:flex-1 overflow-x-auto scrollbar-hide">
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleLike}
                         className={cn(
-                            "flex-1 gap-2 hover:bg-gray-50 transition-colors",
+                            "flex-1 gap-1.5 sm:gap-2 hover:bg-gray-50 transition-colors px-1 sm:px-3",
                             (liked || (post as any).is_liked) ? "text-blue-600 font-medium" : "text-gray-600"
                         )}
                     >
-                        <ThumbsUp className={cn("h-5 w-5", (liked || (post as any).is_liked) && "fill-current")} />
-                        <span className="text-sm font-medium">Like</span>
+                        <ThumbsUp className={cn("h-4 w-4 sm:h-5 sm:w-5", (liked || (post as any).is_liked) && "fill-current")} />
+                        <span className="text-[11px] sm:text-sm font-medium">Like</span>
                     </Button>
 
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleDislike}
-                        className={cn("flex-1 gap-2 hover:bg-gray-50", disliked ? "text-red-600 font-medium" : "text-gray-600")}
+                        className={cn("flex-1 gap-1.5 sm:gap-2 hover:bg-gray-50 px-1 sm:px-3", disliked ? "text-red-600 font-medium" : "text-gray-600")}
+                        title={`Dislike ${dislikesCount > 0 ? `(${dislikesCount})` : ''}`}
                     >
-                        <ThumbsDown className={cn("h-5 w-5", disliked ? "fill-current" : "")} />
-                        <span className="text-sm font-medium">Dislike {dislikesCount > 0 && `(${dislikesCount})`}</span>
+                        <ThumbsDown className={cn("h-4 w-4 sm:h-5 sm:w-5", disliked ? "fill-current" : "")} />
+                        <span className="text-[11px] sm:text-sm font-medium hidden sm:inline">Dislike {dislikesCount > 0 && `(${dislikesCount})`}</span>
                     </Button>
 
                     {/* Comment Button - Desktop (Toggle) */}
                     <Button
                         variant="ghost"
                         size="sm"
-                        className={cn("hidden md:flex flex-1 gap-2 hover:bg-gray-50", showComments ? "text-blue-600 bg-blue-50" : "text-gray-600")}
+                        className={cn("hidden md:flex flex-1 gap-2 hover:bg-gray-50 px-3", showComments ? "text-blue-600 bg-blue-50" : "text-gray-600")}
                         onClick={() => setShowComments(!showComments)}
                     >
                         <MessageCircle className={cn("h-5 w-5", showComments && "fill-current")} />
@@ -763,65 +765,85 @@ export function PostCard({ post }: PostCardProps) {
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="flex md:hidden flex-1 gap-2 text-gray-600 hover:bg-gray-50"
+                        className="flex md:hidden flex-1 gap-1.5 sm:gap-2 text-gray-600 hover:bg-gray-50 px-1 sm:px-3"
                         onClick={() => navigate(`/post/${post.id}`)}
                     >
-                        <MessageCircle className="h-5 w-5" />
-                        <span className="text-sm font-medium">Comment</span>
+                        <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="text-[11px] sm:text-sm font-medium">Comment</span>
                     </Button>
 
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1 gap-2 text-gray-600 hover:bg-gray-50"
+                        className="flex-1 gap-1.5 sm:gap-2 text-gray-600 hover:bg-gray-50 px-1 sm:px-3"
                         onClick={() => setShowShareDialog(true)}
                     >
-                        <Share2 className="h-5 w-5" />
-                        <span className="text-sm font-medium">Share</span>
+                        <Share2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="text-[11px] sm:text-sm font-medium">Share</span>
                     </Button>
                 </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="p-3 pt-0 flex justify-end gap-2">
-                {isJob && (
-                    <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white shadow-sm px-5 rounded-full flex-1 sm:flex-none" onClick={() => {
-                        const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
-                        const jobTitle = post.title || 'this position';
-                        const autoMsg = `Hi! I'm interested in the "${jobTitle}" role. Can you share more details?`;
-                        requireAuth(() => navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`));
-                    }}>
-                        Apply Now
-                    </Button>
-                )}
-                {isService && (
-                    <Button
-                        size="sm"
-                        className="bg-teal-600 hover:bg-teal-700 text-white shadow-sm px-5 rounded-full flex-1 sm:flex-none"
-                        onClick={() => {
-                            const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
-                            const serviceTitle = post.title || 'your service';
-                            const autoMsg = `Hi! I'm interested in "${serviceTitle}". Can we discuss availability and pricing?`;
-                            requireAuth(() => navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`));
-                        }}
-                    >
-                        Contact
-                    </Button>
-                )}
-                {isNormal && (
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-primary-200 text-primary-700 hover:bg-primary-50 px-5 rounded-full flex-1 sm:flex-none"
-                        onClick={() => {
-                            const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
-                            const autoMsg = `Hi! I saw your post and wanted to reach out.`;
-                            requireAuth(() => navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`));
-                        }}
-                    >
-                        Message
-                    </Button>
-                )}
+                {/* Primary CTA (Apply / Contact / Message) */}
+                <div className="w-full sm:w-auto p-2 sm:p-0 sm:pr-3 sm:py-2 border-t sm:border-t-0 border-gray-50">
+                    {isJob && (
+                        <Button
+                            className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white shadow-sm px-6 rounded-xl sm:rounded-full h-10 sm:h-9"
+                            onClick={() => {
+                                requireAuth(async () => {
+                                    try {
+                                        await api.post('/applications/', { job: post.id });
+                                        alert("Application submitted successfully!");
+
+                                        const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
+                                        const jobTitle = post.title || 'this position';
+                                        const autoMsg = `Hi! I'm interested in the "${jobTitle}" role. Can you share more details?`;
+                                        navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`);
+                                    } catch (err: any) {
+                                        console.error("Failed to apply", err);
+                                        const errorMsg = err.response?.data?.non_field_errors?.[0] || err.response?.data?.detail || "Failed to apply.";
+
+                                        if (errorMsg === "You have already applied for this job.") {
+                                            const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
+                                            const jobTitle = post.title || 'this position';
+                                            const autoMsg = `Hi! I'm interested in the "${jobTitle}" role. Can you share more details?`;
+                                            navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`);
+                                        } else {
+                                            alert(errorMsg);
+                                        }
+                                    }
+                                });
+                            }}
+                        >
+                            Apply Now
+                        </Button>
+                    )}
+                    {isService && (
+                        <Button
+                            className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white shadow-sm px-6 rounded-xl sm:rounded-full h-10 sm:h-9"
+                            onClick={() => {
+                                const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
+                                const serviceTitle = post.title || 'your service';
+                                const autoMsg = `Hi! I'm interested in "${serviceTitle}". Can we discuss availability and pricing?`;
+                                requireAuth(() => navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`));
+                            }}
+                        >
+                            Contact
+                        </Button>
+                    )}
+                    {isNormal && (
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto border-primary-200 text-primary-700 hover:bg-primary-50 px-6 rounded-xl sm:rounded-full h-10 sm:h-9 shadow-sm"
+                            onClick={() => {
+                                const userId = (post as any).created_by || (post as any).user_id || (typeof post.user === 'object' ? post.user?.id : post.user);
+                                const autoMsg = `Hi! I saw your post and wanted to reach out.`;
+                                requireAuth(() => navigate(`/inbox?userId=${userId}&message=${encodeURIComponent(autoMsg)}`));
+                            }}
+                        >
+                            Message
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <ShareDialog isOpen={showShareDialog} onClose={() => setShowShareDialog(false)} post={post} />

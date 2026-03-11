@@ -13,6 +13,7 @@ import {
     Zap,
     Settings as SettingsIcon,
     Bookmark,
+    Users,
 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../ui/Button";
@@ -34,11 +35,13 @@ const AUTH_ITEMS = [
     { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Bell, label: "Notifications", path: "/notifications" },
     { icon: Bookmark, label: "Saved", path: "/saved" },
+    { icon: Briefcase, label: "Applied Jobs", path: "/applied-jobs" },
+    { icon: Users, label: "Applicants", path: "/applicants" },
     { icon: User, label: "Profile", path: "/profile" },
     { icon: SettingsIcon, label: "Settings", path: "/settings" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
     const location = useLocation();
     const navigate = useNavigate();
     const { isAuthenticated, openAuthModal } = useAuth();
@@ -90,7 +93,10 @@ export default function Sidebar() {
     }, [location.pathname]);
 
     return (
-        <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-white border-r border-gray-100 p-4 shadow-soft-xl z-40">
+        <aside className={cn(
+            "fixed md:sticky top-0 left-0 h-screen bg-white border-r border-gray-100 p-4 shadow-2xl md:shadow-soft-xl z-50 flex flex-col w-64 transition-transform duration-300 ease-in-out",
+            isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}>
             {/* Logo */}
             {/* Logo */}
             {/* Logo */}
@@ -113,6 +119,7 @@ export default function Sidebar() {
                             <Link
                                 key={item.path}
                                 to={item.path}
+                                onClick={() => onClose && onClose()}
                                 className={cn(
                                     "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium group",
                                     isActive
@@ -147,7 +154,10 @@ export default function Sidebar() {
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                onClick={handleAuthItemClick}
+                                onClick={(e) => {
+                                    handleAuthItemClick(e);
+                                    if (onClose) onClose();
+                                }}
                                 className={cn(
                                     "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium group",
                                     isActive

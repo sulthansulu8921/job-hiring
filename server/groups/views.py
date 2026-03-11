@@ -13,6 +13,16 @@ class GroupViewSet(viewsets.ModelViewSet):
         group = serializer.save(created_by=self.request.user)
         group.members.add(self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.created_by != request.user:
+            return Response(
+                {"error": "You do not have permission to delete this community."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=['post'])
     def join(self, request, pk=None):
         group = self.get_object()

@@ -1,6 +1,22 @@
 from rest_framework import generics, permissions
 from .models import Application
-from .serializers import ApplicationSerializer
+from .serializers import ApplicationSerializer, ApplicationStatusUpdateSerializer
+
+class EmployerApplicationListView(generics.ListAPIView):
+    serializer_class = ApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Employers see applications for the jobs they created
+        return Application.objects.filter(job__created_by=self.request.user)
+
+class ApplicationStatusUpdateView(generics.UpdateAPIView):
+    serializer_class = ApplicationStatusUpdateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Only the job creator can update the status
+        return Application.objects.filter(job__created_by=self.request.user)
 
 class ApplicationListCreateView(generics.ListCreateAPIView):
     serializer_class = ApplicationSerializer

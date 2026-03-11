@@ -1,46 +1,84 @@
-import { Search } from "lucide-react";
+import { Search, Menu, ArrowLeft } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import logo from "../../assets/logo.png";
+import { cn } from "../../utils/cn";
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState("");
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
-            navigate(`/jobs?search=${encodeURIComponent(searchQuery)}`);
+            setIsMobileSearchOpen(false);
+            navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
         }
     };
 
-    return (
-        <header className="bg-white border-b border-gray-100 sticky top-0 z-40 w-full">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex h-16 items-center justify-between gap-4">
+    useEffect(() => {
+        if (isMobileSearchOpen && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [isMobileSearchOpen]);
 
-                    {/* Mobile Menu Trigger & Logo Area (Visible on Mobile) */}
-                    <div className="flex items-center gap-2 md:hidden">
-                        <Link to="/" className="block">
-                            <img src={logo} alt="Thozhilurappu" className="h-10 w-auto object-contain" />
+    return (
+        <header className="bg-white border-b border-gray-100 sticky top-0 z-40 w-full relative">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex h-20 items-center justify-between gap-4">
+
+                    {/* Mobile Menu & Logo Area - Hidden on Desktop because Sidebar has logo */}
+                    <div className={cn("items-center gap-3 shrink-0 md:hidden", isMobileSearchOpen ? "hidden" : "flex")}>
+                        <Button variant="ghost" size="icon" onClick={onMenuClick} className="md:hidden -ml-2">
+                            <Menu className="h-6 w-6 text-gray-700" />
+                        </Button>
+                        <Link to="/" className="flex items-center shrink-0">
+                            <img
+                                src={logo}
+                                alt="Thozhilurappu"
+                                className="h-16 sm:h-20 w-auto object-contain transition-transform hover:scale-105"
+                            />
                         </Link>
                     </div>
 
-                    {/* Search Bar - Central */}
-                    <form onSubmit={handleSearch} className="flex-1 max-w-lg relative hidden md:block">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        <Input
-                            placeholder="Search jobs, companies, or skills..."
-                            className="pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors w-full"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+
+                    {/* Search Bar - Desktop hidden on mobile unless isMobileSearchOpen is true */}
+                    <form
+                        onSubmit={handleSearch}
+                        className={cn(
+                            "flex-1 md:max-w-lg relative",
+                            isMobileSearchOpen ? "flex items-center gap-2" : "hidden md:block"
+                        )}
+                    >
+                        {isMobileSearchOpen && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsMobileSearchOpen(false)}
+                                className="md:hidden -ml-2 shrink-0"
+                            >
+                                <ArrowLeft className="h-5 w-5 text-gray-600" />
+                            </Button>
+                        )}
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                            <Input
+                                ref={searchInputRef}
+                                placeholder="Search jobs, companies, or skills..."
+                                className="pl-9 bg-gray-50 border-gray-200 focus:bg-white transition-colors w-full"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
                     </form>
 
-                    {/* Quick Page Switches & Actions */}
-                    <div className="flex items-center gap-2 md:gap-6">
+                    {/* Quick Page Switches & Actions (Hidden when Mobile Search Open) */}
+                    <div className={cn("flex items-center gap-2 md:gap-6", isMobileSearchOpen ? "hidden md:flex" : "flex")}>
                         {/* Desktop Navigation */}
                         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
                             <Link to="/jobs?type=Remote" className="hover:text-primary-600 transition-colors">Remote</Link>
@@ -49,9 +87,9 @@ export default function Topbar() {
                             <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
                         </nav>
 
-                        {/* Mobile: Search Icon Toggle could go here if needed, but for now kept simple */}
+                        {/* Mobile: Search Icon Toggle */}
                         <div className="flex md:hidden">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => setIsMobileSearchOpen(true)}>
                                 <Search className="h-5 w-5 text-gray-600" />
                             </Button>
                         </div>

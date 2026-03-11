@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/Badge";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
+
 export default function JobDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -38,9 +39,10 @@ export default function JobDetails() {
     const handleApply = () => {
         requireAuth(async () => {
             try {
+                // Post to Django API directly
                 await api.post('/applications/', { job: id });
-                // navigate to chat after successful application
-                navigate(`/inbox?userId=${job.created_by}`);
+                alert("Application Submitted");
+                navigate('/applied-jobs');
             } catch (err: any) {
                 console.error("Failed to apply", err);
                 alert(err.response?.data?.non_field_errors?.[0] || err.response?.data?.detail || "Failed to apply");
