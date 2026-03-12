@@ -74,7 +74,31 @@ export default defineConfig([
 
 # thozhilurappu
 
-cd server 
-source venv/bin/activate 
-python manage.py runserver
+### Local Development
+1. **Backend**:
+   ```bash
+   cd server
+   source venv/bin/activate
+   python manage.py runserver
+   ```
+2. **Frontend**:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment (Render Blueprint)
+
+This project is configured for one-click deployment to **Render** using the `render.yaml` blueprint.
+
+### Steps to Deploy:
+1. Push your code to a **GitHub** or **GitLab** repository.
+2. Sign in to [Render](https://render.com/).
+3. Go to **Blueprints** and click **New Blueprint Instance**.
+4. Connect your repository.
+5. Render will automatically detect `render.yaml` and set up:
+   - **Frontend** (Static Site)
+   - **Backend** (Python Web Service with Daphne for WebSockets)
+   - **Database** (PostgreSQL)
+   - **Cache** (Redis)
+6. Once deployed, update your **Google OAuth** credentials in the Google Cloud Console with your new production URLs.
 
