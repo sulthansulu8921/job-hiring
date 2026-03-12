@@ -23,11 +23,10 @@ services:
         value: "*" # Set this to your specific domains later
 
   # Frontend Static Site (Vite)
-  - type: web
+  - type: static
     name: thozhilurappu-frontend
-    env: static
     buildCommand: npm install && npm run build
-    staticPublishDir: dist
+    publishDir: dist
     envVars:
       - key: VITE_API_URL
         fromService:
@@ -48,11 +47,12 @@ services:
         source: /*
         destination: /index.html
 
-# Database & Redis Infrastructure
-databases:
-  - name: thozhilurappu-db
+  # Redis for Caching and WebSockets (Key Value)
+  - type: redis
+    name: thozhilurappu-redis
     plan: free
 
-redises:
-  - name: thozhilurappu-redis
+# Database Infrastructure
+databases:
+  - name: thozhilurappu-db
     plan: free
