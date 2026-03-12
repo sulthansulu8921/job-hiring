@@ -30,16 +30,9 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: thozhilurappu-backend
-          property: url
-          suffix: /api
+        value: https://thozhilurappu-backend.onrender.com/api
       - key: VITE_WS_URL
-        fromService:
-          type: web
-          name: thozhilurappu-backend
-          property: url
+        value: wss://thozhilurappu-backend.onrender.com
     routes:
       - type: rewrite
         source: /api/*
