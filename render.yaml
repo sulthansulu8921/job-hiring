@@ -27,7 +27,7 @@ services:
     name: thozhilurappu-frontend
     runtime: static
     buildCommand: npm install && npm run build
-    staticPublishDir: dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
         fromService:
