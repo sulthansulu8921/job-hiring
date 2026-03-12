@@ -21,6 +21,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useWebSocket } from "../../../hooks/useWebSocket";
 import api from "../../../services/api";
 import logo from "../../../assets/logo.png";
+import { GroupsSidebar } from "./GroupsSidebar";
 
 const NAV_ITEMS = [
     { icon: Home, label: "Home", path: "/" },
@@ -185,6 +186,11 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
                             </Link>
                         );
                     })}
+                </div>
+
+                {/* Communities Section - Visible on mobile/tablet since right sidebar is hidden */}
+                <div className="mt-8 xl:hidden">
+                    <GroupsSidebar />
                 </div>
             </nav>
 
