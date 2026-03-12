@@ -12,7 +12,7 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: thozhilurappu-redis
           property: connectionString
       - key: SECRET_KEY
@@ -23,10 +23,11 @@ services:
         value: "*" # Set this to your specific domains later
 
   # Frontend Static Site (Vite)
-  - type: static
+  - type: web
     name: thozhilurappu-frontend
+    runtime: static
     buildCommand: npm install && npm run build
-    publishDir: dist
+    staticPublishDir: dist
     envVars:
       - key: VITE_API_URL
         fromService:
@@ -48,9 +49,9 @@ services:
         destination: /index.html
 
   # Redis for Caching and WebSockets (Key Value)
-  - type: redis
+  - type: keyvalue
     name: thozhilurappu-redis
-    plan: free
+    ipAllowList: [] # Allow all internal traffic
 
 # Database Infrastructure
 databases:
