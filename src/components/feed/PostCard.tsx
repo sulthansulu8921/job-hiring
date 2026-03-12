@@ -4,8 +4,9 @@ import { MoreHorizontal, MessageCircle, ThumbsUp, ThumbsDown, Share2, MapPin, Ch
 import type { Post, JobPost, ServicePost } from '../../types';
 import { usePosts } from "../../context/PostsContext";
 import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { cn } from '../../utils/cn';
+import { Button } from "../ui/Button";
+import { cn } from "../../utils/cn";
+import { getImageUrl } from "../../utils/image";
 import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import { ShareDialog } from './ShareDialog';
 import CommentsSection from './CommentsSection';
@@ -114,11 +115,11 @@ export function PostCard({ post }: PostCardProps) {
             try {
                 if (connectionStatus === 'received') {
                     // Accept connection
-                    await api.post(`/ profiles / user / ${post.user.id} /accept/`);
+                    await api.post(`/profiles/user/${post.user.id}/accept/`);
                     setConnectionStatus('accepted');
                 } else {
                     // Toggle pending/connected state
-                    const res = await api.post(`/ profiles / user / ${post.user.id} /connect/`);
+                    const res = await api.post(`/profiles/user/${post.user.id}/connect/`);
                     setConnectionStatus(res.data.status === 'disconnected' ? 'none' : res.data.status);
                 }
             } catch (err) {
@@ -130,7 +131,7 @@ export function PostCard({ post }: PostCardProps) {
     const confirmWithdraw = async () => {
         if (!post.user?.id) return;
         try {
-            const res = await api.post(`/ profiles / user / ${post.user.id} /connect/`);
+            const res = await api.post(`/profiles/user/${post.user.id}/connect/`);
             setConnectionStatus(res.data.status === 'disconnected' ? 'none' : res.data.status);
             setShowWithdrawConfirm(false);
         } catch (err) {
@@ -343,7 +344,7 @@ export function PostCard({ post }: PostCardProps) {
                         }}
                     >
                         {(post.user?.avatar || (post as any).user_avatar) ? (
-                            <img src={post.user?.avatar || (post as any).user_avatar} alt={post.user?.name || (post as any).user_name} className="h-full w-full object-cover" />
+                            <img src={getImageUrl(post.user?.avatar || (post as any).user_avatar)} alt={post.user?.name || (post as any).user_name} className="h-full w-full object-cover" />
                         ) : (
                             <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500 text-sm font-bold">
                                 {(post.user?.name?.[0] || (post as any).user_name?.[0]) || 'U'}
@@ -688,7 +689,7 @@ export function PostCard({ post }: PostCardProps) {
                     {post.images ? post.images.map((img, idx) => (
                         <div key={idx} className={cn("relative bg-gray-100", post.images!.length === 1 ? "aspect-video" : "aspect-square")}>
                             <img
-                                src={img}
+                                src={getImageUrl(img)}
                                 alt=""
                                 className="absolute inset-0 w-full h-full object-cover"
                                 onError={(e) => {
@@ -699,7 +700,7 @@ export function PostCard({ post }: PostCardProps) {
                     )) : (post as any).image && (
                         <div className="relative bg-gray-100 aspect-video">
                             <img
-                                src={(post as any).image}
+                                src={getImageUrl((post as any).image)}
                                 alt=""
                                 className="absolute inset-0 w-full h-full object-cover"
                                 onError={(e) => {

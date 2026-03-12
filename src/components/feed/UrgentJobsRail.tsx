@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Zap, MapPin, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../ui/Button";
+import { getImageUrl } from "../../utils/image";
 import api from "../../services/api";
 
 export default function UrgentJobsRail() {
@@ -78,7 +79,7 @@ export default function UrgentJobsRail() {
 
                         <div className="flex items-start justify-between mb-3">
                             <div className={`h-10 w-10 rounded-xl flex items-center justify-center overflow-hidden border border-gray-100 shadow-sm`}>
-                                <img src={job.company_logo || `https://ui-avatars.com/api/?name=${job.company_name}&background=random`} alt={job.company_name} className="h-full w-full object-cover" />
+                                <img src={getImageUrl(job.company_logo) || `https://ui-avatars.com/api/?name=${job.company_name}&background=random`} alt={job.company_name} className="h-full w-full object-cover" />
                             </div>
                             <span className="text-[10px] font-semibold bg-red-50 text-red-600 px-2 py-1 rounded-full border border-red-100">
                                 Urgent

@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Users, MessageCircle, Newspaper, Send, ChevronLeft, Info, Mic, Square, Trash2, Volume2, Image as ImageIcon } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { getImageUrl } from '../utils/image';
 
 export default function GroupDetail() {
     const { id } = useParams();
@@ -189,7 +190,7 @@ export default function GroupDetail() {
             {/* Header */}
             <div className="bg-white rounded-b-2xl shadow-sm border-x border-b border-gray-100 overflow-hidden mb-6">
                 <div className="h-32 md:h-48 bg-gradient-to-r from-primary-600 to-secondary-600 relative">
-                    {group.banner && <img src={group.banner} className="w-full h-full object-cover" alt="Banner" />}
+                    {group.banner && <img src={getImageUrl(group.banner)} className="w-full h-full object-cover" alt="Banner" />}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -203,7 +204,7 @@ export default function GroupDetail() {
                     <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-12 mb-4">
                         <div className="h-24 w-24 rounded-2xl bg-white p-1 shadow-lg border-2 border-white">
                             <div className="h-full w-full rounded-xl bg-primary-100 flex items-center justify-center overflow-hidden">
-                                {group.image ? <img src={group.image} className="h-full w-full object-cover" alt={group.name} /> : <Users className="h-10 w-10 text-primary-600" />}
+                                {group.image ? <img src={getImageUrl(group.image)} className="h-full w-full object-cover" alt={group.name} /> : <Users className="h-10 w-10 text-primary-600" />}
                             </div>
                         </div>
                         <div className="flex-1">
@@ -297,11 +298,11 @@ export default function GroupDetail() {
                                                     {msg.message_type === 'audio' ? (
                                                         <div className="flex items-center gap-2 py-1">
                                                             <Volume2 className="h-4 w-4" />
-                                                            <audio src={msg.attachment || msg.audio} controls className="h-8 w-40 brightness-90 contrast-125" />
+                                                            <audio src={getImageUrl(msg.attachment || msg.audio)} controls className="h-8 w-40 brightness-90 contrast-125" />
                                                         </div>
                                                     ) : msg.message_type === 'image' ? (
                                                         <div className="rounded-lg overflow-hidden mt-1">
-                                                            <img src={msg.attachment || msg.content} alt="Shared" className="max-w-full h-auto" />
+                                                            <img src={getImageUrl(msg.attachment || msg.content)} alt="Shared" className="max-w-full h-auto" />
                                                         </div>
                                                     ) : (
                                                         msg.message || msg.content

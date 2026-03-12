@@ -3,6 +3,7 @@ import { Button } from "../../ui/Button";
 import { Users, ChevronRight } from "lucide-react";
 import type { Group } from "../../../types";
 import { useNavigate } from "react-router-dom";
+import { getImageUrl } from "../../../utils/image";
 
 export function GroupsSidebar() {
     const { groups, joinGroup, leaveGroup } = usePosts();
@@ -31,7 +32,7 @@ export function GroupsSidebar() {
                             <div className="flex items-center gap-3">
                                 <div className="h-8 w-8 rounded-lg bg-primary-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                                     {group.image ? (
-                                        <img src={group.image} alt={group.name} className="h-full w-full object-cover" />
+                                        <img src={getImageUrl(group.image)} alt={group.name} className="h-full w-full object-cover" />
                                     ) : (
                                         <span className="text-primary-700 font-bold text-xs">{group.name[0]}</span>
                                     )}
