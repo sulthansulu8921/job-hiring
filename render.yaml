@@ -3,6 +3,7 @@ services:
   - type: web
     name: thozhilurappu-backend
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput
     startCommand: daphne -b 0.0.0.0 -p $PORT backend.asgi:application
     envVars:
@@ -44,6 +45,7 @@ services:
   # Redis for Caching and WebSockets (Key Value)
   - type: keyvalue
     name: thozhilurappu-redis
+    plan: free
     ipAllowList: [] # Allow all internal traffic
 
 # Database Infrastructure
