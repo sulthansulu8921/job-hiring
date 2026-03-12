@@ -3,6 +3,11 @@ export const getImageUrl = (url: string | null | undefined) => {
     if (url.startsWith('http')) return url;
     if (url.startsWith('blob:')) return url; // Handle local previews
 
-    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '');
-    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    const apiRoot = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    // Remove /api trailing part to get the base domain for media
+    const baseUrl = apiRoot.endsWith('/api') ? apiRoot.slice(0, -4) : apiRoot;
+
+    // Ensure we don't double up on slashes
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${cleanUrl}`;
 };

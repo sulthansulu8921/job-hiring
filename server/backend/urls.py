@@ -4,6 +4,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views import GlobalSearchView, FeedView
 
+from django.views.static import serve
+from django.urls import re_path
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
@@ -19,6 +22,7 @@ urlpatterns = [
     path('api/search/', GlobalSearchView.as_view(), name='global-search'),
     path('api/feed/', FeedView.as_view(), name='feed'),
     path('api/groups/', include('groups.urls')),
+    
+    # Manual media serving for production (DEBUG=False)
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
-
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
